@@ -378,7 +378,7 @@ function App() {
         setActiveRedeemCode(SUPER_REDEEM_CODE);
         setRedeemCodeError('');
         setShowRedeemModal(false);
-        setStep('intro');
+        setStep('landing');
         return;
       }
 
@@ -405,7 +405,7 @@ function App() {
       setActiveRedeemCode(record.code);
       setRedeemCodeError('');
       setShowRedeemModal(false);
-      setStep('intro');
+      setStep('landing');
     } catch (error) {
       setRedeemCodeError(error?.message || '兑换码校验失败');
     }
