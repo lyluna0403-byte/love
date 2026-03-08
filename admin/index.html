@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>依恋类型后台管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-[#FFFCFA]">
+<div id="root"></div>
+<script type="text/babel">
+const { useMemo, useState } = React;
+
+const SUPABASE_URL = 'https://isnoaavqpurryevhegnd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlzbm9hYXZxcHVycnlldmhlZ25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxOTI2OTIsImV4cCI6MjA4Nzc2ODY5Mn0.833Y4EDz-Er0xrEL9PrkowoO88Y8-StGfSPEyrzW_es';
+const ADMIN_PASSWORD = 'inlight';
+
+const supabase = (SUPABASE_URL.includes('YOUR_PROJECT_ID') || SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY'))
+  ? null
+  : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const escapeCsv = (value) => {
+  const s = String(value ?? '');
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+};
+
+const downloadText = (filename, content, type = 'text/plain;charset=utf-8') => {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+function App() {
+  const [pwd, setPwd] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [codes, setCodes] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [codeFilter, setCodeFilter] = useState('all');
+
+  const stats = useMemo(() => {
+    const used = codes.filter((c) => c.is_used).length;
+    return {
+      total: codes.length,
+      used,
+      unused: codes.length - used,
+      submissions: submissions.length
+    };
+  }, [codes, submissions]);
+
+  const filteredCodes = useMemo(() => {
+    if (codeFilter === 'used') return codes.filter((c) => c.is_used);
+    if (codeFilter === 'unused') return codes.filter((c) => !c.is_used);
+    return codes;
+  }, [codes, codeFilter]);
+  const usedCodes = useMemo(() => codes.filter((c) => c.is_used), [codes]);
+
+  const loadData = async () => {
+    if (!supabase) {
+      setError('暂时无法连接数据库');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    const [{ data: codeRows, error: codeErr }, { data: subRows, error: subErr }] = await Promise.all([
+      supabase.from('redeem_codes').select('*').order('created_at', { ascending: false }),
+      supabase.from('attachment_submissions').select('*').order('submitted_at', { ascending: false })
+    ]);
+    setLoading(false);
+    if (codeErr || subErr) {
+      setError(codeErr?.message || subErr?.message || '加载失败');
+      return;
+    }
+    setCodes(codeRows || []);
+    setSubmissions(subRows || []);
+  };
+
+  const downloadSubmissionsCsv = () => {
+    const header = ['id', 'submitted_at', 'redeem_code', 'session_id', 'dominant_type', 'dominant_avoidance', 'dominant_anxiety', 'role_types', 'answers'];
+    const rows = submissions.map((item) => [
+      item.id,
+      item.submitted_at,
+      item.redeem_code,
+      item.session_id,
+      item.results?.dominant?.type || '',
+      item.results?.dominant?.avoidance ?? '',
+      item.results?.dominant?.anxiety ?? '',
+      JSON.stringify((item.results?.roles || []).map((r) => r.type)),
+      JSON.stringify(item.answers || {})
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    downloadText(`attachment-submissions-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
+  };
+
+  const downloadCodesCsv = () => {
+    const header = ['code', 'is_used', 'used_at', 'used_session_id', 'created_at'];
+    const rows = codes.map((item) => [item.code, item.is_used ? 'Y' : 'N', item.used_at || '', item.used_session_id || '', item.created_at || '']);
+    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+    downloadText(`attachment-redeem-codes-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
+  };
+
+  if (!authed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-white rounded-3xl border border-[#EFE4DD] p-8 shadow-sm">
+          <h1 className="text-2xl text-center tracking-widest text-[#443B36] mb-3">依恋类型后台管理</h1>
+          <p className="text-sm text-center text-[#8C7D75] mb-6">请输入管理员口令</p>
+          <input
+            type="password"
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+            placeholder="管理员口令"
+            className="w-full rounded-2xl border border-[#EADFD8] px-4 py-3 mb-4 focus:outline-none focus:border-[#DFA39C]"
+          />
+          <button
+            onClick={() => {
+              if (pwd !== ADMIN_PASSWORD) {
+                setError('口令错误');
+                return;
+              }
+              setAuthed(true);
+              setError('');
+              loadData();
+            }}
+            className="w-full rounded-full bg-[#DFA39C] hover:bg-[#D1928A] text-white py-3 tracking-widest"
+          >
+            登录
+          </button>
+          {error && <p className="text-sm text-[#C97E74] mt-4 text-center">{error}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white rounded-3xl border border-[#EFE4DD] p-6 mb-5 shadow-sm">
+          <div className="flex flex-wrap gap-3 items-center justify-between">
+            <h1 className="text-2xl tracking-widest text-[#443B36]">依恋类型后台管理</h1>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={loadData} className="px-4 py-2 rounded-full bg-[#DFA39C] text-white">刷新</button>
+              <button onClick={downloadSubmissionsCsv} className="px-4 py-2 rounded-full border border-[#EADFD8] bg-white">下载作答CSV</button>
+              <button onClick={downloadCodesCsv} className="px-4 py-2 rounded-full border border-[#EADFD8] bg-white">下载兑换码CSV</button>
+            </div>
+          </div>
+          {error && <p className="text-sm text-[#C97E74] mt-3">{error}</p>}
+          {loading && <p className="text-sm text-[#8C7D75] mt-3">加载中...</p>}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+          <div className="bg-white rounded-2xl border border-[#EFE4DD] p-4 text-center"><p className="text-xs text-[#8C7D75]">兑换码总数</p><p className="text-2xl text-[#443B36] mt-1">{stats.total}</p></div>
+          <div className="bg-white rounded-2xl border border-[#EFE4DD] p-4 text-center"><p className="text-xs text-[#8C7D75]">已使用</p><p className="text-2xl text-[#443B36] mt-1">{stats.used}</p></div>
+          <div className="bg-white rounded-2xl border border-[#EFE4DD] p-4 text-center"><p className="text-xs text-[#8C7D75]">未使用</p><p className="text-2xl text-[#443B36] mt-1">{stats.unused}</p></div>
+          <div className="bg-white rounded-2xl border border-[#EFE4DD] p-4 text-center"><p className="text-xs text-[#8C7D75]">作答记录</p><p className="text-2xl text-[#443B36] mt-1">{stats.submissions}</p></div>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-[#EFE4DD] p-4 shadow-sm overflow-x-auto">
+          <h2 className="text-lg tracking-widest text-[#443B36] mb-3">最近作答记录</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#EFE4DD] text-[#8C7D75] text-left">
+                <th className="py-2 pr-3">ID</th>
+                <th className="py-2 pr-3">提交时间</th>
+                <th className="py-2 pr-3">兑换码</th>
+                <th className="py-2 pr-3">主导类型</th>
+              </tr>
+            </thead>
+            <tbody>
+              {submissions.slice(0, 100).map((row) => (
+                <tr key={row.id} className="border-b border-[#F6EFEB]">
+                  <td className="py-2 pr-3">{row.id}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap">{(row.submitted_at || '').replace('T', ' ').slice(0, 19)}</td>
+                  <td className="py-2 pr-3">{row.redeem_code}</td>
+                  <td className="py-2 pr-3">{row.results?.dominant?.type || '-'}</td>
+                </tr>
+              ))}
+              {!submissions.length && (
+                <tr><td colSpan={4} className="py-8 text-center text-[#8C7D75]">暂无记录</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-[#EFE4DD] p-4 shadow-sm overflow-x-auto mt-5">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <h2 className="text-lg tracking-widest text-[#443B36]">兑换码使用明细</h2>
+            <div className="flex gap-2 text-sm">
+              <button onClick={() => setCodeFilter('all')} className={`px-3 py-1 rounded-full border ${codeFilter === 'all' ? 'bg-[#DFA39C] text-white border-[#DFA39C]' : 'bg-white border-[#EADFD8]'}`}>全部</button>
+              <button onClick={() => setCodeFilter('used')} className={`px-3 py-1 rounded-full border ${codeFilter === 'used' ? 'bg-[#DFA39C] text-white border-[#DFA39C]' : 'bg-white border-[#EADFD8]'}`}>已使用</button>
+              <button onClick={() => setCodeFilter('unused')} className={`px-3 py-1 rounded-full border ${codeFilter === 'unused' ? 'bg-[#DFA39C] text-white border-[#DFA39C]' : 'bg-white border-[#EADFD8]'}`}>未使用</button>
+            </div>
+          </div>
+          {usedCodes.length > 0 && (
+            <div className="mb-4 rounded-2xl border border-[#F4D8D2] bg-[#FFF7F5] p-3">
+              <p className="text-sm text-[#B56E62] mb-2">已使用兑换码（{usedCodes.length}）</p>
+              <div className="flex flex-wrap gap-2">
+                {usedCodes.map((c) => (
+                  <span key={c.code} className="px-2.5 py-1 rounded-full bg-[#DFA39C] text-white text-xs tracking-wider">
+                    {c.code}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#EFE4DD] text-[#8C7D75] text-left">
+                <th className="py-2 pr-3">兑换码</th>
+                <th className="py-2 pr-3">状态</th>
+                <th className="py-2 pr-3">使用时间</th>
+                <th className="py-2 pr-3">会话ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCodes.slice(0, 300).map((row) => (
+                <tr key={row.code} className={`border-b ${row.is_used ? 'bg-[#FFF7F5] border-[#F4D8D2]' : 'border-[#F6EFEB]'}`}>
+                  <td className="py-2 pr-3 whitespace-nowrap">{row.code}</td>
+                  <td className="py-2 pr-3">
+                    {row.is_used ? (
+                      <span className="px-2 py-0.5 rounded-full bg-[#DFA39C] text-white text-xs">已使用</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-[#F5F5F5] text-[#8C7D75] text-xs">未使用</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-3 whitespace-nowrap">{(row.used_at || '').replace('T', ' ').slice(0, 19) || '-'}</td>
+                  <td className="py-2 pr-3 whitespace-nowrap">{row.used_session_id || '-'}</td>
+                </tr>
+              ))}
+              {!filteredCodes.length && (
+                <tr><td colSpan={4} className="py-8 text-center text-[#8C7D75]">暂无记录</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
