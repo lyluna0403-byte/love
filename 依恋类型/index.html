@@ -469,8 +469,8 @@ function App() {
       roleResults.push({ avoidance: avo, anxiety: anx, type: getAttachmentType(avo, anx) });
     });
 
-    const dominantAvo = roleResults.slice(0, 4).reduce((acc, curr) => acc + curr.avoidance, 0) / 4;
-    const dominantAnx = roleResults.slice(0, 4).reduce((acc, curr) => acc + curr.anxiety, 0) / 4;
+    const dominantAvo = roleResults.reduce((acc, curr) => acc + curr.avoidance, 0) / 5;
+    const dominantAnx = roleResults.reduce((acc, curr) => acc + curr.anxiety, 0) / 5;
 
     const finalResults = {
       roles: roleResults,
