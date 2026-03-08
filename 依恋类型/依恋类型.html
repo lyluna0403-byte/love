@@ -203,9 +203,10 @@ const healingAdvice = {
 const SUPABASE_URL = 'https://isnoaavqpurryevhegnd.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlzbm9hYXZxcHVycnlldmhlZ25kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxOTI2OTIsImV4cCI6MjA4Nzc2ODY5Mn0.833Y4EDz-Er0xrEL9PrkowoO88Y8-StGfSPEyrzW_es';
 const SUPER_REDEEM_CODE = 'INLIGHT';
-const COUNSELOR_QR_PRIMARY = 'https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/pLdn55XXX3jW5no8/img/9e3650c1-038e-4cca-b5c0-a5daef3e56d2.png';
+const COUNSELOR_QR_PRIMARY = '/assets/wechat-qr.png';
 const COUNSELOR_QR_SOURCES = [
   COUNSELOR_QR_PRIMARY,
+  'https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/pLdn55XXX3jW5no8/img/9e3650c1-038e-4cca-b5c0-a5daef3e56d2.png',
   'https://images.weserv.nl/?url=alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/pLdn55XXX3jW5no8/img/9e3650c1-038e-4cca-b5c0-a5daef3e56d2.png'
 ];
 const supabase = (SUPABASE_URL.includes('YOUR_PROJECT_ID') || SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY'))
@@ -1126,7 +1127,7 @@ function App() {
                 <img
                   src={COUNSELOR_QR_SOURCES[qrSourceIndex]}
                   alt="咨询师微信"
-                  className="w-[140px] h-[140px] rounded-xl object-contain mix-blend-multiply opacity-90 transition-all hover:opacity-100 block mx-auto"
+                  className="w-[140px] h-[140px] rounded-xl object-contain transition-all hover:opacity-100 block mx-auto"
                   loading="lazy"
                   decoding="async"
                   referrerPolicy="no-referrer"

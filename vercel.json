@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin/index.html" },
+    { "source": "/admin/(.*)", "destination": "/admin/$1" },
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/", "destination": "/依恋类型/index.html" },
+    { "source": "/(.*)", "destination": "/依恋类型/index.html" }
+  ]
+}
