@@ -517,6 +517,16 @@ function App() {
     }
   };
 
+  const prevRole = () => {
+    if (currentRoleIndex > 0) {
+      setCurrentRoleIndex(prev => prev - 1);
+      window.scrollTo(0, 0);
+      return;
+    }
+    setStep('intro');
+    window.scrollTo(0, 0);
+  };
+
   const restartTest = () => {
     setStep('landing');
     setCurrentRoleIndex(0);
@@ -759,7 +769,16 @@ function App() {
             })}
           </div>
 
-          <div className="mt-12 flex justify-center pb-12 relative z-10">
+          <div className="mt-12 flex justify-center gap-4 pb-12 relative z-10">
+            <button
+              onClick={prevRole}
+              className={`px-10 py-4 rounded-full font-serif tracking-widest text-[15px] transition-all duration-500 flex items-center ${
+                'bg-white/90 border border-[#EADFD8] text-[#8C7D75] hover:text-[#443B36] hover:-translate-y-1'
+              }`}
+            >
+              <ArrowLeft className="mr-2 w-4 h-4" />
+              {currentRoleIndex === 0 ? '返回上一页' : '上一个对象'}
+            </button>
             <button
               disabled={!isCurrentRoleComplete()}
               onClick={nextRole}
